@@ -40,6 +40,14 @@ var (
 	EcrecoverGas           = big.NewInt(3000)   //
 	Sha256WordGas          = big.NewInt(12)     //
 
+	// ZSL START
+	// For now, let's just use the same gas as built-in function sha256
+	Sha256CompressGas     = Sha256Gas
+	Sha256CompressWordGas = Sha256WordGas
+	VerifyZKProofGas      = Sha256Gas
+	VerifyZKProofWordGas  = Sha256WordGas
+	// ZSL END
+
 	MinGasLimit     = big.NewInt(700000000)             // Minimum the gas limit may ever be.
 	GenesisGasLimit = big.NewInt(800000000)             // Gas limit of the Genesis block.
 	TargetGasLimit  = new(big.Int).Set(GenesisGasLimit) // The artificial target

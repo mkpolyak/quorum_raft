@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/registrar/ethreg"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/quorum"
+	"github.com/ethereum/go-ethereum/core/zsl"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
@@ -326,6 +327,12 @@ func (s *Ethereum) APIs() []rpc.API {
 			Namespace: "quorum",
 			Version:   "1.0",
 			Service:   quorum.NewPublicQuorumAPI(s.blockVoting),
+		},
+		{
+			Namespace: "zsl",
+			Version:   "1.0",
+			Service:   zsl.NewPublicZSLAPI(),
+			Public:	true,
 		},
 	}...)
 }

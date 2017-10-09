@@ -12,7 +12,7 @@
 GOBIN = build/bin
 GO ?= latest
 
-geth:
+geth: zsl
 	build/env.sh go run build/ci.go install ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
@@ -22,7 +22,7 @@ evm:
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/evm to start the evm."
 
-all:
+all: zsl
 	build/env.sh go run build/ci.go install
 
 test: all
@@ -30,6 +30,11 @@ test: all
 
 clean:
 	rm -fr build/_workspace/pkg/ Godeps/_workspace/pkg $(GOBIN)/*
+	cd vendor/github.com/jpmorganchase/zsl-q/zsl-golang/zsl/snark/ ; $(MAKE) clean
+
+zsl:
+	cd vendor/github.com/jpmorganchase/zsl-q/zsl-golang/zsl/snark/ ; $(MAKE)
+	@echo "Done building libzsl.a"
 
 # Cross Compilation Targets (xgo)
 

@@ -32,6 +32,7 @@ var Modules = map[string]string{
 	"rpc":        RPC_JS,
 	"shh":        Shh_JS,
 	"txpool":     TxPool_JS,
+	"zsl":        ZSL_JS,
 }
 
 const Bzz_JS = `
@@ -679,6 +680,95 @@ web3._extend({
 				return status;
 			}
 		})
+	]
+});
+`
+
+const ZSL_JS = `
+web3._extend({
+	property: 'zsl',
+	methods:
+	[
+		new web3._extend.Method({
+			name: 'loadTracker',
+			call: 'zsl_loadTracker',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'saveTracker',
+			call: 'zsl_saveTracker',
+			params: 2
+		}),
+		new web3._extend.Method({
+			name: 'getCommitment',
+			call: 'zsl_getCommitment',
+			params: 3
+		}),
+		new web3._extend.Method({
+			name: 'getSendNullifier',
+			call: 'zsl_getSendNullifier',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getSpendNullifier',
+			call: 'zsl_getSpendNullifier',
+			params: 2
+		}),
+		new web3._extend.Method({
+			name: 'createShielding',
+			call: 'zsl_createShielding',
+			params: 3
+		}),
+		new web3._extend.Method({
+			name: 'createUnshielding',
+			call: 'zsl_createUnshielding',
+			params: 5
+		}),
+		new web3._extend.Method({
+			name: 'createShieldedTransfer',
+			call: 'zsl_createShieldedTransfer',
+			params: 16
+		}),
+		new web3._extend.Method({
+			name: 'verifyShieldedTransfer',
+			call: 'zsl_verifyShieldedTransfer',
+			params: 8
+		}),
+		new web3._extend.Method({
+			name: 'verifyShielding',
+			call: 'zsl_verifyShielding',
+			params: 4
+		}),
+		new web3._extend.Method({
+			name: 'verifyUnshielding',
+			call: 'zsl_verifyUnshielding',
+			params: 4
+		}),
+		new web3._extend.Method({
+			name: 'getNewAddress',
+			call: 'zsl_getNewAddress',
+			params: 0
+		}),
+		new web3._extend.Method({
+			name: 'getRandomness',
+			call: 'zsl_getRandomness',
+			params: 0
+		}),
+		new web3._extend.Method({
+			name: 'debugShielding',
+			call: 'zsl_debugShielding',
+			params: 0
+		}),
+		new web3._extend.Method({
+			name: 'debugUnshielding',
+			call: 'zsl_debugUnshielding',
+			params: 0
+		}),
+		new web3._extend.Method({
+			name: 'debugShieldedTransfer',
+			call: 'zsl_debugShieldedTransfer',
+			params: 0
+		}),
 	]
 });
 `

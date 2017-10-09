@@ -17,6 +17,8 @@
 package vm
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,7 +26,17 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/params"
+
+	// ZSL START
+	sha256compress "github.com/jpmorganchase/zsl-q/zsl-golang/zsl/sha256"
+	"github.com/jpmorganchase/zsl-q/zsl-golang/zsl/snark"
+	// ZSL END
 )
+
+// ZSL START
+const ZSL_PROOF_SIZE uint64 = 584
+
+// ZSL END
 
 // PrecompiledAccount represents a native ethereum contract
 type PrecompiledAccount struct {
@@ -69,6 +81,38 @@ func PrecompiledContracts() map[string]*PrecompiledAccount {
 
 			return n.Add(n, params.IdentityGas)
 		}, memCpy},
+
+		// ZSL START
+
+		// Sha256Compress
+		string(common.LeftPadBytes([]byte{0x88, 0x01}, 20)): &PrecompiledAccount{func(l int) *big.Int {
+			n := big.NewInt(int64(l+31) / 32)
+			n.Mul(n, params.Sha256CompressWordGas)
+			return n.Add(n, params.Sha256CompressGas)
+		}, sha256CompressFunc},
+
+		// Verify Shielded Transfer
+		string(common.LeftPadBytes([]byte{0x88, 0x02}, 20)): &PrecompiledAccount{func(l int) *big.Int {
+			n := big.NewInt(int64(l+31) / 32)
+			n.Mul(n, params.VerifyZKProofWordGas)
+			return n.Add(n, params.VerifyZKProofGas)
+		}, verifyShieldedTransferFunc},
+
+		// Verify Shielding
+		string(common.LeftPadBytes([]byte{0x88, 0x03}, 20)): &PrecompiledAccount{func(l int) *big.Int {
+			n := big.NewInt(int64(l+31) / 32)
+			n.Mul(n, params.VerifyZKProofWordGas)
+			return n.Add(n, params.VerifyZKProofGas)
+		}, verifyShieldingFunc},
+
+		// Verify Unshielding
+		string(common.LeftPadBytes([]byte{0x88, 0x04}, 20)): &PrecompiledAccount{func(l int) *big.Int {
+			n := big.NewInt(int64(l+31) / 32)
+			n.Mul(n, params.VerifyZKProofWordGas)
+			return n.Add(n, params.VerifyZKProofGas)
+		}, verifyUnshieldingFunc},
+
+		// ZSL END
 	}
 }
 
@@ -117,3 +161,178 @@ func ecrecoverFunc(in []byte) []byte {
 func memCpy(in []byte) []byte {
 	return in
 }
+
+// ZSL START
+
+/*
+	Input bytes when the precompile is called with string "hello":
+	0000000000000000000000000000000000000000000000000000000000000020
+	0000000000000000000000000000000000000000000000000000000000000005
+	68656c6c6f000000000000000000000000000000000000000000000000000000
+*/
+func sha256CompressFunc(in []byte) []byte {
+	// ignore keccac
+	in = in[4:]
+
+	// ignore next 32 bytes
+	in = in[32:]
+
+	// check payload size
+	n := binary.BigEndian.Uint64(in[24:32])
+	if n != 64 {
+		glog.Errorln("ZSL input must have size of 64 bytes (512 bits)")
+		return nil
+	}
+
+	// skip payload size
+	in = in[32:]
+
+	c := sha256compress.NewCompress()
+	c.Write(in[0:n])
+	return c.Compress()
+}
+
+/**
+In geth:
+zslprecompile.VerifyShielding("0x001122", "0x08dbb5c1357d05e5178c9f8b88b590e0728d36f1a2e04ae93e963d5174fc4d35", "0xff2c9bdc59089c8d3aa313e9394a19ea17dbfa6f8b2520c7165734b6da615dc4", 12345)
+
+Data passed into function:
+4e320263000000000000000000000000000000000000000000000000000000000000000808dbb5c1357d05e5178c9f8b88b590e0728d36f1a2e04ae93e963d5174fc4d35ff2c9bdc59089c8d3aa313e9394a19ea17dbfa6f8b2520c7165734b6da615dc400000000000000000000000000000000000000000000000000000000000030390000000000000000000000000000000000000000000000000000000000000003001122
+*/
+func verifyShieldingFunc(in []byte) []byte {
+	snark.Init()
+
+	// ignore keccac
+	in = in[4:]
+
+	// ignore next 32 bytes
+	in = in[32:]
+
+	var send_nf [32]byte
+	var cm [32]byte
+	copy(send_nf[:], in[:32])
+	copy(cm[:], in[32:64])
+	noteValue := binary.BigEndian.Uint64(in[88:96])
+	proofSize := binary.BigEndian.Uint64(in[120:128]) // should be 584
+
+	if proofSize != ZSL_PROOF_SIZE {
+		glog.Errorf("ZSL error, proof must have size of %d bytes, not %d.\n", ZSL_PROOF_SIZE, proofSize)
+		return nil
+	}
+
+	var proof [ZSL_PROOF_SIZE]byte
+	copy(proof[:], in[128:])
+
+	result := snark.VerifyShielding(proof, send_nf, cm, noteValue)
+	var b byte
+	if result {
+		b = 1
+	}
+
+	glog.Errorln("verifyShieldingFunc: ", hex.EncodeToString(in))
+	glog.Errorln("send_nf: ", hex.EncodeToString(send_nf[:]))
+	glog.Errorln("     cm: ", hex.EncodeToString(cm[:]))
+	glog.Errorln("  value: ", noteValue)
+	glog.Errorln("   size: ", proofSize)
+	glog.Errorln("  proof: ", hex.EncodeToString(in[128:]))
+	glog.Errorln(" result: ", result)
+
+	return []byte{b}
+}
+
+func verifyUnshieldingFunc(in []byte) []byte {
+	snark.Init()
+
+	// ignore keccac
+	in = in[4:]
+
+	// ignore next 32 bytes
+	in = in[32:]
+
+	var spend_nf [32]byte
+	var rt [32]byte
+	copy(spend_nf[:], in[:32])
+	copy(rt[:], in[32:64])
+	noteValue := binary.BigEndian.Uint64(in[88:96])
+	proofSize := binary.BigEndian.Uint64(in[120:128]) // should be 584
+
+	if proofSize != ZSL_PROOF_SIZE {
+		glog.Errorf("ZSL error, proof must have size of %d bytes, not %d.\n", ZSL_PROOF_SIZE, proofSize)
+		return nil
+	}
+
+	var proof [ZSL_PROOF_SIZE]byte
+	copy(proof[:], in[128:])
+
+	result := snark.VerifyUnshielding(proof, spend_nf, rt, noteValue)
+	var b byte
+	if result {
+		b = 1
+	}
+
+	glog.Errorln("verifyUnshieldingFunc: ", hex.EncodeToString(in))
+	glog.Errorln("spend_nf: ", hex.EncodeToString(spend_nf[:]))
+	glog.Errorln("      rt: ", hex.EncodeToString(rt[:]))
+	glog.Errorln("   value: ", noteValue)
+	glog.Errorln("    size: ", proofSize)
+	glog.Errorln("   proof: ", hex.EncodeToString(in[128:]))
+	glog.Errorln("  result: ", result)
+
+	return []byte{b}
+}
+
+func verifyShieldedTransferFunc(in []byte) []byte {
+
+	// ignore keccac
+	in = in[4:]
+
+	// ignore next 32 bytes
+	in = in[32:]
+
+	var anchor [32]byte
+	var spend_nf_1 [32]byte
+	var spend_nf_2 [32]byte
+	var send_nf_1 [32]byte
+	var send_nf_2 [32]byte
+	var cm_1 [32]byte
+	var cm_2 [32]byte
+	copy(anchor[:], in[:32])
+	copy(spend_nf_1[:], in[32:64])
+	copy(spend_nf_2[:], in[64:96])
+	copy(send_nf_1[:], in[96:128])
+	copy(send_nf_2[:], in[128:160])
+	copy(cm_1[:], in[160:192])
+	copy(cm_2[:], in[192:224])
+	proofSize := binary.BigEndian.Uint64(in[248:256]) // should be 584
+
+	if proofSize != ZSL_PROOF_SIZE {
+		glog.Errorf("ZSL error, proof must have size of %d bytes, not %d.\n", ZSL_PROOF_SIZE, proofSize)
+		return nil
+	}
+
+	var proof [ZSL_PROOF_SIZE]byte
+	copy(proof[:], in[256:])
+
+	snark.Init()
+	result := snark.VerifyTransfer(proof, anchor, spend_nf_1, spend_nf_2, send_nf_1, send_nf_2, cm_1, cm_2)
+	var b byte
+	if result {
+		b = 1
+	}
+
+	glog.Errorln("verifyShieldedTransferFunc: ", hex.EncodeToString(in))
+	glog.Errorln("spend_nf_1: ", hex.EncodeToString(spend_nf_1[:]))
+	glog.Errorln("spend_nf_2: ", hex.EncodeToString(spend_nf_2[:]))
+	glog.Errorln(" send_nf_1: ", hex.EncodeToString(send_nf_1[:]))
+	glog.Errorln(" send_nf_2: ", hex.EncodeToString(send_nf_2[:]))
+	glog.Errorln("      cm_1: ", hex.EncodeToString(cm_1[:]))
+	glog.Errorln("      cm_2: ", hex.EncodeToString(cm_2[:]))
+	glog.Errorln("    anchor: ", hex.EncodeToString(anchor[:]))
+	glog.Errorln("      size: ", proofSize)
+	glog.Errorln("     proof: ", hex.EncodeToString(proof[:]))
+	glog.Errorln("    result: ", result)
+
+	return []byte{b}
+}
+
+// ZSL END

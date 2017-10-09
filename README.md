@@ -1,3 +1,9 @@
+# ZSL on Quorum
+
+This branch of Quorum 1.5 supports [ZSL on Quroum](https://github.com/jpmorganchase/zsl-q/blob/master/README.md).
+
+Original README follows.
+
 # Quorum
 
 Quorum is an Ethereum-based distributed ledger protocol with transaction/contract privacy and a new consensus mechanism.
